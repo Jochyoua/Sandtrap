@@ -1,0 +1,34 @@
+# Enable debug logging
+debug: false
+
+metrics: true
+
+
+# Armor Weight Configuration
+# These values represent the "weight" of each armor type.
+# The total weight determines how many blocks below the player will update.
+# The value is rounded UP to ensure even light armor causes terrain reaction.
+
+armorWeights:
+  NONE: 0.2
+  LEATHER: 0.5
+  CHAINMAIL: 1.0
+  GOLD: 1.5
+  IRON: 2.0
+  DIAMOND: 2.5
+  NETHERITE: 3.0
+
+
+# Minimum depth of block updates (optional)
+# Ensures at least this many blocks are affected, even if weight is low.
+minimumDepth: 1
+message: "&cYou feel the ground tremor beneath your feet."
+freezePlayer: true
+freezePlayerCommand: "minecraft:effect give %s minecraft:slowness 3 10 true"
+
+
+fallingBlockWhitelist:
+  - SAND
+  - RED_SAND
+  - GRAVEL
+  - CONCRETE_POWDER

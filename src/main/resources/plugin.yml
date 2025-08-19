@@ -1,0 +1,9 @@
+name: SandTrap
+version: '${version}'
+main: io.github.jochyoua.sandtrap.SandTrap
+description: Terrain reacts to armor weight. The heavier you are, the deeper you sink.
+api-version: '1.13'
+commands:
+  SandtrapReload:
+    description: "Command for reloading config"
+    default: op
