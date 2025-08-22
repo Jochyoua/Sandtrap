@@ -7,3 +7,7 @@ commands:
   SandtrapReload:
     description: "Command for reloading config"
     default: op
+permissions:
+  sandtrap.immune:
+    description: "Ignore traps entirely"
+    default: false
