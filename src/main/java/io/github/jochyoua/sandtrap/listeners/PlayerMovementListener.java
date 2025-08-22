@@ -2,22 +2,24 @@ package io.github.jochyoua.sandtrap.listeners;
 
 import io.github.jochyoua.sandtrap.SandTrap;
 import io.github.jochyoua.sandtrap.utilities.ArmorWeightUtil;
+import io.github.jochyoua.sandtrap.utilities.DebugLogger;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class PlayerMovementListener implements Listener {
     private final SandTrap plugin;
@@ -29,13 +31,13 @@ public class PlayerMovementListener implements Listener {
 
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
-        if (!hasPlayerChangedBlock(event)) {
+        Player player = event.getPlayer();
+        if (!hasPlayerChangedBlock(event) || !shouldTriggerTrap(player)) {
             return;
         }
-        Player player = event.getPlayer();
 
 
-        int depth = Math.max(ArmorWeightUtil.getTotalWeight(player, plugin.getConfig()), plugin.getConfig().getInt("minimumDepth", 1));
+        int depth = calculateDepth(player);
 
 
         for (int i = 1; i <= depth; i++) {
@@ -46,13 +48,98 @@ public class PlayerMovementListener implements Listener {
             boolean fromValid = checkAndUpdate(blockFrom);
 
             if (!toValid && !fromValid) {
-                break;
+                continue;
             }
 
             triggerEffects(player);
         }
 
     }
+
+    private boolean shouldTriggerTrap(Player player) {
+        FileConfiguration config = plugin.getConfig();
+        List<String> allowedGamemodes = config.getStringList("allowedGamemodes");
+
+        if (config.getBoolean("flightGroundCheck", true)) {
+            boolean flying   = player.isFlying();
+            boolean onGround = player.isOnGround();
+
+            if (flying || !onGround) {
+                DebugLogger.log(plugin, () ->
+                        String.format(
+                                "[FlightCheck] Skipping %s: flying=%b, onGround=%b",
+                                player.getName(), flying, onGround
+                        )
+                );
+                return false;
+            }
+        }
+
+        if (player.hasPermission("sandtrap.immune")) {
+            DebugLogger.log(plugin, () -> "Trap skipped for " + player.getName() + " due to immunity permission: sandtrap.immune");
+            return false;
+        }
+
+        boolean isGamemodeDisallowed = allowedGamemodes.stream().noneMatch(mode -> mode.equalsIgnoreCase(player.getGameMode().name()));
+        if (isGamemodeDisallowed) {
+            DebugLogger.log(plugin, () -> (String.format("Trap ignored for %s due to game mode '%s'. Allowed modes: %s", player.getName(), player.getGameMode(), String.join(", ", allowedGamemodes))));
+            return false;
+        }
+
+        if (config.getBoolean("biomeFilter.enabled", false)) {
+            String biome = player.getLocation().getBlock().getBiome().name();
+            List<String> list = config.getStringList("biomeFilter.list");
+            String mode = config.getString("biomeFilter.mode", "whitelist").trim().toLowerCase();
+
+            boolean listed = false;
+            for (String b : list) {
+                if (b.equalsIgnoreCase(biome)) {
+                    listed = true;
+                    break;
+                }
+            }
+
+            boolean allowed = ("whitelist".equals(mode)) ? listed : !"blacklist".equals(mode) || !listed;
+
+            if (!allowed) {
+                if (config.getBoolean("debug", false)) {
+                    DebugLogger.log(plugin, () -> String.format("Trap ignored for %s in biome '%s'. Mode: %s, List: [%s]", player.getName(), biome, mode, String.join(", ", list)));
+                }
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private int calculateDepth(Player player) {
+        FileConfiguration config = plugin.getConfig();
+        int minimumDepth = config.getInt("minimumDepth", 1);
+        int rawDepth = Math.max(ArmorWeightUtil.getTotalWeight(player, config), minimumDepth);
+
+        String mode = config.getString("sneak-behavior.mode", "negate");
+        int negateCount = config.getInt("sneak-behavior.negate-count", 3);
+
+        if (player.isSneaking()) {
+            switch (mode) {
+                case "negate":
+                    rawDepth -= negateCount;
+                    break;
+                case "disable":
+                    rawDepth = minimumDepth;
+                    break;
+                case "ignore":
+                    break;
+                default:
+                    if (plugin.getLogger().isLoggable(Level.WARNING)) {
+                        plugin.getLogger().warning("Unknown sneak-behavior.mode: " + mode);
+                    }
+            }
+        }
+
+        return Math.max(rawDepth, minimumDepth);
+    }
+
 
     private void triggerEffects(Player player) {
         long now = System.currentTimeMillis();
@@ -63,10 +150,7 @@ public class PlayerMovementListener implements Listener {
             player.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
         }
 
-        if (plugin.getConfig().getBoolean("debug", false)) {
-            long totalWeight = ArmorWeightUtil.getTotalWeight(player, plugin.getConfig());
-            plugin.getLogger().info(String.format("Player %s triggered a trap! Total weight was %d.", player.getName(), totalWeight));
-        }
+        DebugLogger.log(plugin, () -> String.format("Player %s triggered a trap! Total weight was %d.", player.getName(), ArmorWeightUtil.getTotalWeight(player, plugin.getConfig())));
 
 
         if (plugin.getConfig().getBoolean("freezePlayer")) {
@@ -78,7 +162,7 @@ public class PlayerMovementListener implements Listener {
         }
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            if(plugin.getConfig().getBoolean("metrics")) {
+            if (plugin.getConfig().getBoolean("metrics.enabled")) {
                 plugin.getConfig().set("metrics.trapTriggers", plugin.getConfig().getInt("metrics.trapTriggers", 0) + 1);
                 plugin.saveConfig();
             }
@@ -106,7 +190,7 @@ public class PlayerMovementListener implements Listener {
                 }, 1L);
 
                 Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                    if(plugin.getConfig().getBoolean("metrics")) {
+                    if (plugin.getConfig().getBoolean("metrics.enabled")) {
                         String typeName = blockBelow.getType().name();
                         String path = "metrics.blockTypeStats." + typeName;
                         int currentCount = plugin.getConfig().getInt(path, 0);
