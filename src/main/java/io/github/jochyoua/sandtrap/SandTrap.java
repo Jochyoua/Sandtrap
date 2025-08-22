@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
 
 public final class SandTrap extends JavaPlugin {
 
@@ -23,11 +24,10 @@ public final class SandTrap extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlayerMovementListener(this), this);
 
         this.registerCommand();
-        if (getConfig().getBoolean("metrics")) {
+        if (getConfig().getBoolean("metrics.enabled")) {
             this.registerMetrics();
         }
         this.validateWhitelist();
-
     }
 
     private void validateWhitelist() {
@@ -38,7 +38,9 @@ public final class SandTrap extends JavaPlugin {
                 if (mat.isBlock() && mat.hasGravity()) {
                     validatedWhitelist.add(entry.toUpperCase());
                 } else {
-                    getLogger().warning("Invalid falling block material: " + entry);
+                    if (getLogger().isLoggable(Level.WARNING)) {
+                        getLogger().warning("Invalid falling block material: " + entry);
+                    }
                 }
             } catch (IllegalArgumentException e) {
                 getLogger().warning("Unknown material in whitelist: " + entry);
