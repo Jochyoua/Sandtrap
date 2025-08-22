@@ -1,32 +1,49 @@
-# Enable debug logging
-debug: false
+# Debug & Metrics
+debug: false             # Only enable this if you want your console spammed
+metrics:
+  enabled: true # Enable plugin metrics collection
 
-metrics: true
-
+# Player Movement Checks
+flightGroundCheck: true  # Skip trap if player is flying or not on the ground
 
 # Armor Weight Configuration
-# These values represent the "weight" of each armor type.
-# The total weight determines how many blocks below the player will update.
-# The value is rounded UP to ensure even light armor causes terrain reaction.
-
+# These weights (rounded) determine how many blocks below the player update.
 armorWeights:
-  NONE: 0.2
-  LEATHER: 0.5
+  NONE:      0.2
+  LEATHER:   0.5
   CHAINMAIL: 1.0
-  GOLD: 1.5
-  IRON: 2.0
-  DIAMOND: 2.5
+  GOLD:      1.5
+  IRON:      2.0
+  DIAMOND:   2.5
   NETHERITE: 3.0
 
+# Sneak Behavior
+sneak-behavior:
+  mode: "negate"      # Options: disable, negate, ignore
+  negate-count: 3     # Number of blocks to ignore when sneaking
 
-# Minimum depth of block updates (optional)
-# Ensures at least this many blocks are affected, even if weight is low.
-minimumDepth: 1
+# Game Mode Filter
+allowedGamemodes:
+  - SURVIVAL
+
+# Biome Filter
+biomeFilter:
+  enabled: false
+  mode:    "whitelist"   # Options: whitelist, blacklist
+  list:
+    - DESERT
+    - BADLANDS
+    - ERODED_BADLANDS
+
+# Trap Depth & Effects
+minimumDepth: 1        # Ensures at least this many blocks are affected
 message: "&cYou feel the ground tremor beneath your feet."
+
 freezePlayer: true
 freezePlayerCommand: "minecraft:effect give %s minecraft:slowness 3 10 true"
 
-
+# Falling-Block Whitelist
+# Only these block types will trigger terrain reactions
 fallingBlockWhitelist:
   - SAND
   - RED_SAND
